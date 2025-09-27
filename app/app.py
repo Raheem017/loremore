@@ -1,16 +1,14 @@
 
 
-
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from faker import Faker
 import random
-import json
-import os
 from datetime import datetime, date
 import decimal
 
 app = Flask(__name__)
+app.config["JSON_SORT_KEYS"] = False   # ✅ keep output in input order
 CORS(app)
 
 fake = Faker()
@@ -31,7 +29,7 @@ def get_safe_methods(fake_instance):
 
 string_methods = get_safe_methods(fake)
 
-# Match field_name directly to known faker methods (no fuzzy logic)
+# Match field_name directly to known faker methods
 def find_direct_faker_method(field_name, methods_list):
     field_name = field_name.lower().replace(" ", "_")
     if field_name in methods_list:
@@ -40,8 +38,18 @@ def find_direct_faker_method(field_name, methods_list):
 
 # Generate data based on type
 def generate_dynamic_value(field_name, field_type):
+    lname = field_name.lower().replace(" ", "_")
+
+    if "gender" in lname:
+        return random.choice(["Male", "Female"])
+    if "email" in lname:
+        return fake.email()
+    if "ip" in lname:
+        return fake.ipv4()
+
+    # 🔹 Handle by type
     if field_type == "string":
-        faker_method = find_direct_faker_method(field_name, string_methods)
+        faker_method = find_direct_faker_method(lname, string_methods)
         if faker_method:
             try:
                 value = faker_method()
@@ -56,11 +64,10 @@ def generate_dynamic_value(field_name, field_type):
             return fake.word()
 
     elif field_type == "int":
-        lname = field_name.lower()
-        if "id" in lname or "count" in lname or "num" in lname:
-            return random.randint(1000, 9999)
-        elif "age" in lname:
+        if "age" in lname:
             return random.randint(1, 120)
+        elif "id" in lname or "count" in lname or "num" in lname:
+            return random.randint(1000, 9999)
         else:
             return random.randint(0, 1000)
 
@@ -71,12 +78,12 @@ def generate_dynamic_value(field_name, field_type):
         return random.choice([True, False])
 
     elif field_type == "date":
-        return fake.date().isoformat()
+        return fake.date()
 
     else:
         return fake.word()
-
-# Endpoint to generate JSON
+    
+# API Endpoint
 @app.route("/", methods=["POST"])
 def generate_json():
     data = request.json
@@ -86,37 +93,15 @@ def generate_json():
     result = []
     for _ in range(num_records):
         record = {}
-        for field in fields:
+        for field in fields:  # preserves input order
             field_name = field.get("name")
             field_type = field.get("type")
             record[field_name] = generate_dynamic_value(field_name, field_type)
         result.append(record)
 
-
-    return jsonify({"message": "Data generated and saved", "records": result})
+    return jsonify({"records": result})
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

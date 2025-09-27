@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import { Formik, Form, Field, FieldArray } from "formik";
-import "../style/styles.css";
 import axios from "axios";
+import CodeMirrorEditor from "./CodeMirrorEditor";
 
 const initialValues = {
   fields: [
@@ -23,11 +23,19 @@ const initialValues = {
 const types = ["int", "string", "float", "boolean"];
 
 export default function Body() {
-  const [jsonOutput, setJsonOutput] = useState(null);
+  const [jsonOutput, setJsonOutput] = useState("// Write some JavaScript here");
 
   const handleDownload = () => {
     if (!jsonOutput) {
       alert("No JSON to Download");
+      return;
+    }
+    try {
+      // Validate JSON before download
+      JSON.parse(jsonOutput);
+    } catch {
+      alert("Invalid JSON format. Please fix the output before downloading.");
+      return;
     }
     const blob = new Blob([jsonOutput], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -51,8 +59,24 @@ export default function Body() {
         }
         try {
           const response = await axios.post("http://localhost:5000/", values);
-          setJsonOutput(JSON.stringify(response.data, null, 2));
-          console.log("Backend Response:", response.data);
+          const orderedRecords = response.data.records.map((record) => {
+            let ordered = {};
+            values.fields.forEach((field) => {
+              ordered[field.name] = record[field.name];
+            });
+            return ordered;
+          });
+
+          setJsonOutput(
+            JSON.stringify(
+              {
+                message: response.data.message,
+                records: orderedRecords,
+              },
+              null,
+              2
+            )
+          );
         } catch (error) {
           console.error("Request failed:", error);
           alert("Something went wrong. Check console.");
@@ -62,7 +86,7 @@ export default function Body() {
       }}
     >
       {({ values }) => (
-        <div className="bg-[#303030] text-white w-full min-h-screen flex flex-col  items-start  p-4 sm:p-6 lg:flex-row  ">
+        <main className="bg-[#fff] w-full min-h-screen flex flex-col items-start p-4 sm:p-6 lg:flex-row mt-16 ">
           <div>
             <Form className="w-full max-w-full ">
               {/* Table header */}
@@ -84,14 +108,14 @@ export default function Body() {
                         <Field
                           name={`fields.${index}.name`}
                           placeholder="field_name"
-                          className="p-2 rounded max-w-3xl w-full border border-white/30 bg-transparent focus:outline-none"
+                          className="p-2 rounded max-w-3xl w-full border border-[#aee0e4]  focus:outline-none"
                         />
 
                         {/* Type dropdown */}
                         <Field
                           as="select"
                           name={`fields.${index}.type`}
-                          className="p-2 rounded w-full max-w-3xl border border-white/30  bg-[#303030] focus:outline-none"
+                          className="p-2 w-full max-w-3xl border border-[#aee0e4]  rounded  focus:outline-none"
                         >
                           {types.map((t) => (
                             <option key={t} value={t}>
@@ -115,7 +139,7 @@ export default function Body() {
                     <button
                       type="button"
                       onClick={() => push({ name: "", type: "int", blank: 0 })}
-                      className="bg-[#303030] border border-white/30 px-4 py-2 mt-2 rounded"
+                      className="text-white bg-[#2046cf] cursor-pointer hover:bg-blue-900 px-4 py-2 mt-2 rounded"
                     >
                       + Add Another Field
                     </button>
@@ -129,7 +153,7 @@ export default function Body() {
                   <Field
                     type="number"
                     name="rows"
-                    className="bg-transparent ml-2 p-1 w-20 rounded border border-white/30 focus:outline-none"
+                    className="border border-[#aee0e4] ml-2 p-1 w-20 rounded  focus:outline-none"
                   />
                 </label>
                 <label>
@@ -137,7 +161,7 @@ export default function Body() {
                   <Field
                     as="select"
                     name="format"
-                    className="bg-transparent ml-2 p-1 rounded border border-white/30 focus:outline-none"
+                    className="border border-[#aee0e4] ml-2 p-1 rounded  focus:outline-none"
                   >
                     <option>JSON</option>
                   </Field>
@@ -146,50 +170,57 @@ export default function Body() {
 
               <button
                 type="submit"
-                className="bg-green-600 px-4 py-2 mt-4 rounded hover:bg-green-500 mb-4"
+                className="bg-[#2046cf] cursor-pointer hover:bg-blue-900 text-white px-4 py-2 mt-4 rounded mb-4"
               >
                 Generate JSON
               </button>
             </Form>
           </div>
-          <div className=" w-full lg:w-[30%]  min-w-[250px] flex flex-col bg-[#303030] border border-white/30 p-5 rounded-md lg:ml-10 lg:mr-4 mt-6 lg:mt-0">
-            <h2 className="text-xl font-bold mb-4">JSON Output</h2>
 
-            <div className="h-[65vh] overflow-y-auto scrollbar-hide">
-              {jsonOutput ? (
-                <pre className="bg-gray-900 p-4 rounded-md overflow-x-auto whitespace-pre-wrap text-green-400">
-                  {jsonOutput}
-                </pre>
-              ) : (
-                <p className="text-gray-500 italic">
-                  Click "Generate JSON" to see output here
-                </p>
+          <div className="w-full lg:w-[40%] flex flex-col border border-blue-200 p-5 rounded-md lg:ml-10 lg:mr-4 mt-6 lg:mt-0">
+            {/* Container for heading + buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <h2 className="text-xl font-bold">JSON Output</h2>
+
+              {jsonOutput && (
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <button
+                    onClick={handleDownload}
+                    disabled={
+                      !jsonOutput.trim() ||
+                      jsonOutput === "// Write some JavaScript here"
+                    }
+                    className="text-white bg-[#2046cf] cursor-pointer hover:bg-blue-900 px-4 py-2 rounded "
+                  >
+                    Download JSON
+                  </button>
+                  <button
+                    onClick={() => {
+                      const jsonUrl = "http://localhost:5000/";
+                      const editorUrl = `https://json-format.com/?url=${encodeURIComponent(
+                        jsonUrl
+                      )}`;
+                      window.open(editorUrl, "_blank");
+                    }}
+                    className=" px-4 py-2 rounded text-white bg-[#2046cf] cursor-pointer hover:bg-blue-900"
+                  >
+                    Editor
+                  </button>
+                </div>
               )}
             </div>
-            {jsonOutput && (
-              <>
-                <button
-                  onClick={handleDownload}
-                  className="bg-blue-600 px-4 py-2 mt-4 rounded hover:bg-blue-500"
-                >
-                  Download JSON
-                </button>
-                <button
-                  onClick={() => {
-                    const jsonUrl = "http://localhost:5000/";
-                    const editorUrl = `https://json-format.com/?url=${encodeURIComponent(
-                      jsonUrl
-                    )}`;
-                    window.open(editorUrl, "_blank");
-                  }}
-                  className="bg-blue-600 px-4 py-2 mt-4 rounded hover:bg-blue-500"
-                >
-                  Editor
-                </button>
-              </>
-            )}
+
+            <div
+              style={{ padding: "1rem" }}
+              className="overflow-y-auto scrollbar-hide mt-4"
+            >
+              <CodeMirrorEditor
+                initialDoc={jsonOutput}
+                onChange={(val) => setJsonOutput(val)}
+              />
+            </div>
           </div>
-        </div>
+        </main>
       )}
     </Formik>
   );
