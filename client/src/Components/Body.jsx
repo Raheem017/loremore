@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useState } from "react";
 import { Formik, Form, Field, FieldArray } from "formik";
 import axios from "axios";
 import CodeMirrorEditor from "./CodeMirrorEditor";
@@ -11,7 +11,7 @@ const initialValues = {
     { name: "gender", type: "string" },
     { name: "age", type: "int" },
     { name: "email", type: "string" },
-    { name: "ip_address", type: "int" },
+    { name: "ip_address", type: "string" },
   ],
   rows: 1000,
   format: "JSON",
@@ -23,7 +23,10 @@ const initialValues = {
 const types = ["int", "string", "float", "boolean"];
 
 export default function Body() {
-  const [jsonOutput, setJsonOutput] = useState("// Write some JavaScript here");
+  const [jsonOutput, setJsonOutput] = useState(
+    "Click Generate JSON to see the output here"
+  );
+  const [hasGenerated, SetHasGenerated] = useState(false);
 
   const handleDownload = () => {
     if (!jsonOutput) {
@@ -52,19 +55,33 @@ export default function Body() {
     <Formik
       initialValues={initialValues}
       onSubmit={async (values, { setSubmitting }) => {
+        const hasEmptyFieldName = values.fields.some(
+          (field) => !field.name.trim()
+        );
+
+        if (hasEmptyFieldName) {
+          alert("Enter all field_name. Field name cannot be empty.");
+          setSubmitting(false);
+          return;
+        }
+
         if (!values.rows || values.rows <= 0) {
           alert("Please enter a valid number of rows (greater than 0).");
           setSubmitting(false);
           return;
         }
         try {
-          const response = await axios.post("http://localhost:5000/", values);
+          const response = await axios.post(
+            "https://jsongenerator.duckdns.org/",
+            values
+          );
           const orderedRecords = response.data.records.map((record) => {
             let ordered = {};
             values.fields.forEach((field) => {
               ordered[field.name] = record[field.name];
             });
             return ordered;
+            
           });
 
           setJsonOutput(
@@ -77,6 +94,7 @@ export default function Body() {
               2
             )
           );
+          SetHasGenerated(true);
         } catch (error) {
           console.error("Request failed:", error);
           alert("Something went wrong. Check console.");
@@ -186,23 +204,30 @@ export default function Body() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <button
                     onClick={handleDownload}
-                    disabled={
-                      !jsonOutput.trim() ||
-                      jsonOutput === "// Write some JavaScript here"
-                    }
-                    className="text-white bg-[#2046cf] cursor-pointer hover:bg-blue-900 px-4 py-2 rounded "
+                    disabled={!hasGenerated}
+                    className={`px-4 py-2 rounded text-white ${
+                      hasGenerated
+                        ? "bg-[#2046cf] hover:bg-blue-900 cursor-pointer"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
                   >
                     Download JSON
                   </button>
                   <button
                     onClick={() => {
+                      if (!hasGenerated) return;
                       const jsonUrl = "http://localhost:5000/";
                       const editorUrl = `https://json-format.com/?url=${encodeURIComponent(
                         jsonUrl
                       )}`;
                       window.open(editorUrl, "_blank");
                     }}
-                    className=" px-4 py-2 rounded text-white bg-[#2046cf] cursor-pointer hover:bg-blue-900"
+                    disabled={!hasGenerated}
+                    className={`px-4 py-2 rounded text-white ${
+                      hasGenerated
+                        ? "bg-[#2046cf] hover:bg-blue-900 cursor-pointer"
+                        : "bg-gray-400 cursor-not-allowed"
+                    }`}
                   >
                     Editor
                   </button>
@@ -217,6 +242,7 @@ export default function Body() {
               <CodeMirrorEditor
                 initialDoc={jsonOutput}
                 onChange={(val) => setJsonOutput(val)}
+                readOnly={!hasGenerated}
               />
             </div>
           </div>
