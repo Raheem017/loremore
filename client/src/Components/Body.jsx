@@ -81,7 +81,6 @@ export default function Body() {
               ordered[field.name] = record[field.name];
             });
             return ordered;
-            
           });
 
           setJsonOutput(
@@ -216,7 +215,7 @@ export default function Body() {
                   <button
                     onClick={() => {
                       if (!hasGenerated) return;
-                      const jsonUrl = "http://localhost:5000/";
+                      const jsonUrl = "https://jsongenerator.duckdns.org/";
                       const editorUrl = `https://json-format.com/?url=${encodeURIComponent(
                         jsonUrl
                       )}`;
